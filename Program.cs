@@ -11,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseKestrel(options =>
 {
     // Setup a HTTP/2 endpoint without TLS.
-    options.ListenLocalhost(builder.Configuration.GetValue<int>("Http2Port"), o => o.Protocols = HttpProtocols.Http2);
+    options.ListenLocalhost(builder.Configuration.GetValue<int>("Http2Port"), o => o.Protocols = HttpProtocols.Http1AndHttp2);
 });
 
 // Add services to the container.
