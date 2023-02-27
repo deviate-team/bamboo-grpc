@@ -2,7 +2,6 @@ using bamboo_grpc.Interfaces;
 using bamboo_grpc.Repositories;
 using bamboo_grpc.Services;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,20 +10,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseKestrel(options =>
 {
     // Setup a HTTP/2 endpoint without TLS.
-    options.ListenLocalhost(builder.Configuration.GetValue<int>("Http2Port"), o => o.Protocols = HttpProtocols.Http1AndHttp2);
+    options.ListenLocalhost(builder.Configuration.GetValue<int>("Http2Port"), o => o.Protocols = HttpProtocols.Http2);
 });
 
 // Add services to the container.
-builder.Services.AddGrpc().AddJsonTranscoding();
+builder.Services.AddGrpc();
 builder.Services.AddGrpcReflection();
 builder.Services.AddSingleton<ITodosRepository, TodosRepository>();
-builder.Services.AddGrpcSwagger();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1",
-        new OpenApiInfo { Title = "TODO API", Version = "v1" });
-});
-
 
 var app = builder.Build();
 
@@ -34,11 +26,6 @@ app.MapGrpcService<TodoService>();
 if (app.Environment.IsDevelopment())
 {
     app.MapGrpcReflectionService();
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
-    });
 }
 
 app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
