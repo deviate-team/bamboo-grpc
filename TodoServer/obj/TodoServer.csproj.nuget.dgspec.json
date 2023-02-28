@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Admin\\Desktop\\TodoServer\\TodoServer\\TodoServer.csproj": {}
+    "C:\\Users\\Admin\\Desktop\\bamboo-grpc\\TodoServer\\TodoServer.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Admin\\Desktop\\TodoServer\\TodoServer\\TodoServer.csproj": {
+    "C:\\Users\\Admin\\Desktop\\bamboo-grpc\\TodoServer\\TodoServer.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Admin\\Desktop\\TodoServer\\TodoServer\\TodoServer.csproj",
+        "projectUniqueName": "C:\\Users\\Admin\\Desktop\\bamboo-grpc\\TodoServer\\TodoServer.csproj",
         "projectName": "TodoServer",
-        "projectPath": "C:\\Users\\Admin\\Desktop\\TodoServer\\TodoServer\\TodoServer.csproj",
+        "projectPath": "C:\\Users\\Admin\\Desktop\\bamboo-grpc\\TodoServer\\TodoServer.csproj",
         "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Admin\\Desktop\\TodoServer\\TodoServer\\obj\\",
+        "outputPath": "C:\\Users\\Admin\\Desktop\\bamboo-grpc\\TodoServer\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Admin\\AppData\\Roaming\\NuGet\\NuGet.Config",
