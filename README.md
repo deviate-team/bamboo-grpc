@@ -1,1 +1,0 @@
-# BAMBOO gRPC and restAPI
