@@ -7,19 +7,21 @@ RUN apt-get update \
 
 ENV PROTOBUF_PROTOC=/usr/bin/protoc
 
-WORKDIR /app
+WORKDIR /src
 
-# copy csproj and restore as distinct layers
 COPY bamboo-grpc.csproj .
+
 RUN dotnet restore
 
-# copy everything else and build app
 COPY . .
 RUN dotnet build --verbosity normal
-RUN dotnet publish -o /out/publish
+RUN dotnet publish --no-restore -c Release -o /published bamboo-grpc.csproj 
 
-# final stage/image
-WORKDIR /out/publish
-EXPOSE 5000 
+FROM mcr.microsoft.com/dotnet/aspnet:7.0 as runtime
+# ENV ASPNETCORE_URLS=https://+:443
+
+WORKDIR /app
+
+COPY --from=build /published .
 
 ENTRYPOINT ["dotnet","bamboo-grpc.dll"]
