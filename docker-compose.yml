@@ -21,7 +21,7 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=example
-      - MONGO_INITDB_DATABASE=example
+      - MONGO_INITDB_DATABASE=mydatabase
       - MONGO_INITDB_USERNAME=admin
       - MONGO_INITDB_PASSWORD=password
     volumes:
