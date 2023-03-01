@@ -1,39 +1,58 @@
 syntax = "proto3";
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 package todo;
 
 service Todo {
     rpc GetAll (google.protobuf.Empty) returns (GetTodosReply);
     rpc Get (GetTodoRequest) returns (GetTodoReply);
-    rpc Post (PostTodoRequest) returns (google.protobuf.Empty);
     rpc Put (PutTodoRequest) returns (google.protobuf.Empty);
+    rpc Post (PostTodoRequest) returns (google.protobuf.Empty);
     rpc Delete (DeleteTodoRequest) returns (google.protobuf.Empty);
 }
 
 message GetTodoRequest {
-    int32 id = 1;
+    string id = 1;
 }
-
+    
+message GetTodoReply {
+    string id = 1;
+    string title = 2;
+    string description = 3;
+    google.protobuf.Timestamp due_date = 4;
+    string status = 5;
+    string priority = 6;
+    google.protobuf.Timestamp create_at = 7;
+    google.protobuf.Timestamp update_at = 8;
+}
+    
 message GetTodosReply {
     repeated GetTodoReply todos = 1;
 }
-
-message GetTodoReply {
-    int32 id = 1;
-    string description = 2;
-}
-
+    
 message PostTodoRequest {
-    string description = 1;
+    string title = 1;
+    oneof optional_fields {
+        string description = 2;
+        google.protobuf.Timestamp due_date = 3;
+        string status = 4;
+        string priority = 5;
+    }
 }
-
+    
 message PutTodoRequest {
-    int32 id = 1;
-    string description = 2;
+    string id = 1;
+    string title = 2;
+    oneof optional_fields {
+        string description = 3;
+        google.protobuf.Timestamp due_date = 4;
+        string status = 5;
+        string priority = 6;
+    }
 }
-
+    
 message DeleteTodoRequest {
-    int32 id = 1;
+    string id = 1;
 }

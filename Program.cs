@@ -1,13 +1,20 @@
 using bamboo_grpc.Interfaces;
 using bamboo_grpc.Repositories;
 using bamboo_grpc.Services;
+using bamboo_grpc.MongoDB;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddGrpc();
 builder.Services.AddGrpcReflection();
-builder.Services.AddSingleton<ITodosRepository, TodosRepository>();
+
+var config = new ServerConfig();
+builder.Configuration.Bind(config);
+
+var todoContext = new TodoContext(config.MongoDB);
+var repo = new TodoRepository(todoContext);
+
+builder.Services.AddSingleton<ITodoRepository>(repo);
 
 var app = builder.Build();
 
