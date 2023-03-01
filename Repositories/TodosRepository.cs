@@ -3,93 +3,111 @@ using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using Serilog;
 
 namespace bamboo_grpc.Repositories
 {
     internal class TodosRepository : ITodosRepository
     {
-        private readonly IMongoCollection<Todo> todos;
-        private readonly IDatabase cache;
+        private readonly ILogger<TodosRepository> _logger;
+        private readonly ConnectionMultiplexer redis;
+        private readonly IMongoCollection<BsonDocument> todosCollection;
         private int currentId = 1;
 
-        public TodosRepository()
+        public TodosRepository(ILoggerFactory loggerFactory)
         {
-            var mongoClient = new MongoClient("mongodb://admin:password@localhost:27017/mydatabase");
-            var database = mongoClient.GetDatabase("mydatabase");
-            todos = database.GetCollection<Todo>("todos");
 
-            var redis = ConnectionMultiplexer.Connect("redis:6379");
-            cache = redis.GetDatabase();
+            this._logger = loggerFactory.CreateLogger<TodosRepository>();
+
+            redis = ConnectionMultiplexer.Connect("redis:6379,password=redispassword");
+            var mongoClient = new MongoClient("mongodb://root:example@mongo:27017");
+            var database = mongoClient.GetDatabase("mydatabase");
+            todosCollection = database.GetCollection<BsonDocument>("todos");
         }
 
         public IEnumerable<(int id, string description)> GetTodos()
         {
-            var cachedResults = cache.Get<List<(int id, string description)>>("todos");
+            var results = new List<(int id, string description)>();
 
-            if (cachedResults != null)
+            var redisTodos = redis.GetDatabase().StringGet("todos");
+            if (redisTodos.HasValue)
             {
-                _logger.LogInformation("Retrieving todos from cache...");
-                return cachedResults;
+                results = Newtonsoft.Json.JsonConvert.DeserializeObject<List<(int id, string description)>>(redisTodos);
+                _logger.LogInformation("Retrieved todos from Redis cache");
             }
-
-            _logger.LogInformation("Retrieving todos from database...");
-
-            var results = todos.Find(_ => true).ToList()
-                .Select(todo => (todo.Id, todo.Description));
-
-            cache.Set("todos", results, TimeSpan.FromMinutes(10));
+            else
+            {
+                var todos = todosCollection.Find(new BsonDocument()).ToList();
+                results = todos.Select(t => ((int)t["_id"], t["description"].AsString)).ToList();
+                redis.GetDatabase().StringSet("todos", Newtonsoft.Json.JsonConvert.SerializeObject(results));
+                _logger.LogInformation("Retrieved todos from MongoDB and added to Redis cache");
+            }
 
             return results;
         }
 
         public string GetTodo(int id)
         {
-            var cachedTodo = cache.Get<string>($"todo:{id}");
-
-            if (cachedTodo != null)
+            var redisTodo = redis.GetDatabase().HashGet("todo", id);
+            if (redisTodo.HasValue)
             {
-                _logger.LogInformation($"Retrieving todo {id} from cache...");
-                return cachedTodo;
+                _logger.LogInformation("Retrieved todo with id {Id} from Redis cache", id);
+                return redisTodo;
             }
-
-            Console.WriteLine($"Retrieving todo {id} from database...");
-
-            var todo = todos.Find(t => t.Id == id).FirstOrDefault();
-
-            if (todo != null)
+            else
             {
-                cache.Set($"todo:{id}", todo.Description, TimeSpan.FromMinutes(10));
-                return todo.Description;
+                var todo = todosCollection.Find(Builders<BsonDocument>.Filter.Eq("_id", id)).FirstOrDefault();
+                if (todo == null)
+                {
+                    _logger.LogInformation("Todo with id {Id} not found in MongoDB", id);
+                    return null;
+                }
+                else
+                {
+                    redis.GetDatabase().HashSet("todo", id, todo["description"].AsString);
+                    _logger.LogInformation("Retrieved todo with id {Id} from MongoDB and added to Redis cache", id);
+                    return todo["description"].AsString;
+                }
             }
-
-            return null;
         }
 
         public void InsertTodo(string description)
         {
-            var todo = new Todo { Id = currentId, Description = description };
-            todos.InsertOne(todo);
-            currentId++;
+            var todo = new BsonDocument
+            {
+                { "_id", currentId },
+                { "description", description }
+            };
 
-            cache.Remove("todos");
+            todosCollection.InsertOne(todo);
+            redis.GetDatabase().HashSet("todo", currentId, description);
+
+            _logger.LogInformation("Added new todo with id {Id} to MongoDB and Redis cache", currentId);
+
+            currentId++;
         }
 
         public void UpdateTodo(int id, string description)
         {
-            var filter = Builders<Todo>.Filter.Eq(t => t.Id, id);
-            var update = Builders<Todo>.Update.Set(t => t.Description, description);
-            todos.UpdateOne(filter, update);
+            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
+            var update = Builders<BsonDocument>.Update.Set("description", description);
+            todosCollection.UpdateOne(filter, update);
 
-            cache.Remove($"todo:{id}");
-            cache.Remove("todos");
+            redis.GetDatabase().HashSet("todo", id, description);
+
+            _logger.LogInformation("Updated todo with id {Id} in MongoDB and Redis cache", id);
         }
 
         public void DeleteTodo(int id)
         {
-            var filter = Builders<Todo>.Filter.Eq(t => t.Id, id);
-            todos.DeleteOne(filter);
+            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
+            todosCollection.DeleteOne(filter);
 
-            cache.Remove($"todo:{id}");
-            cache.Remove("todos");
+            redis.GetDatabase().HashDelete("todo", id);
+
+            _logger.LogInformation("Deleted todo with id {Id} from MongoDB and Redis cache", id);
         }
     }
+}
