@@ -1,139 +1,100 @@
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
-
+using System.Linq;
 using Todo;
 using bamboo_grpc;
-using bamboo_grpc.Interfaces;
 using bamboo_grpc.Repositories;
+using bamboo_grpc.Models;
 
-namespace bamboo_grpc.Services;
-
-public class TodoService : Todo.Todo.TodoBase
+namespace bamboo_grpc.Services
 {
-    private readonly ITodosRepository _repository;
-    private readonly ILogger<TodoService> _logger;
-
-    public TodoService(ITodosRepository repository, ILoggerFactory loggerFactory)
+    public class TodoService : Todo.Todo.TodoBase
     {
-        this._repository = repository;
-        this._logger = loggerFactory.CreateLogger<TodoService>();
-    }
+        private readonly ITodosRepository _repository;
+        private readonly ILogger<TodoService> _logger;
 
-    public override async Task<GetTodosReply> GetAll(
-        Empty request,
-        ServerCallContext context)
-    {
-        try
+        public TodoService(ITodosRepository repository, ILoggerFactory loggerFactory)
         {
-            var todos = await _repository.GetTodos();
-            var reply = new GetTodosReply();
+            this._repository = repository;
+            this._logger = loggerFactory.CreateLogger<TodoService>();
+        }
 
-            foreach (var todo in todos)
-            {
-                reply.Todos.Add(new GetTodoReply
-                {
-                    Id = todo.Id,
-                    Title = todo.Title,
-                    Description = todo.Description,
-                    DueDate = Timestamp.FromDateTime(todo.DueDate.ToUniversalTime()),
-                    Status = todo.Status,
-                    Priority = todo.Priority
-                });
-            }
+        public override async Task<GetTodosReply> GetAll(Empty request, ServerCallContext context)
+        {
+            var response = new GetTodosReply();
+            response.Todos.AddRange(
+                (await _repository.GetTodos()).Select(
+                    t =>
+                        new GetTodoReply
+                        {
+                            Id = t.Id,
+                            Title = t.Title,
+                            Description = t.Description,
+                            DueDate = t.DueDate,
+                            Status = t.Status,
+                            Priority = t.Priority,
+                        }
+                )
+            );
+
             _logger.LogInformation("GetAll method called");
-            return reply;
+            return response;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError("GetAll method failed: {ex}", ex);
-            throw;
-        }
-    }
 
-    public override async Task<GetTodoReply> Get(
-        GetTodoRequest request,
-        ServerCallContext context)
-    {
-        try
+        public override async Task<GetTodoReply> Get(
+            GetTodoRequest request,
+            ServerCallContext context
+        )
         {
-            var todo = await _repository.GetTodo(request.Id);
-            var reply = new GetTodoReply
+            var todos = await _repository.GetTodoById(request.Id);
+            var response = new GetTodoReply
             {
-                Id = todo.Id,
-                Title = todo.Title,
-                Description = todo.Description,
-                DueDate = Timestamp.FromDateTime(todo.DueDate.ToUniversalTime()),
-                Status = todo.Status,
-                Priority = todo.Priority
+                Id = todos.Id,
+                Title = todos.Title,
+                Description = todos.Description,
+                DueDate = todos.DueDate,
+                Status = todos.Status,
+                Priority = todos.Priority,
             };
             _logger.LogInformation("Get method called");
-            return reply;
+            return response;
         }
-        catch (Exception ex)
+
+        public override async Task<Empty> Post(PostTodoRequest request, ServerCallContext context)
         {
-            _logger.LogError("Get method failed: {ex}", ex);
-            throw;
-        }
-    }
-                                                                                                                                                                
-    public override async Task<Empty> Post(
-        PostTodoRequest request,
-        ServerCallContext context)
-    {
-        try {
             await _repository.InsertTodo(
                 request.Title,
                 request.Description,
-                request.DueDate.ToDateTime(),
+                request.DueDate,
                 request.Status,
                 request.Priority
             );
             _logger.LogInformation("Post method called");
+            return new Empty();
         }
-        catch (Exception ex)
-        {
-            _logger.LogError("Post method failed: {ex}", ex);
-            throw;
-        }
-    }
 
-    public override async Task<Empty> Put(
-        PutTodoRequest request,
-        ServerCallContext context)
-    {
-        try
+        public override async Task<Empty> Put(PutTodoRequest request, ServerCallContext context)
         {
             await _repository.UpdateTodo(
                 request.Id,
                 request.Title,
                 request.Description,
-                request.DueDate.ToDateTime(),
+                request.DueDate,
                 request.Status,
                 request.Priority
             );
             _logger.LogInformation("Put method called");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Put method failed: {ex}", ex);
-            throw;
-        }
-    }
-
-    public override async Task<Empty> Delete(
-        DeleteTodoRequest request,
-        ServerCallContext context)
-    {   
-        try
-        {
-            await _repository.DeleteTodo(request.Id);
-            _logger.LogInformation("Delete method called");
             return new Empty();
         }
-        catch (Exception ex)
+
+        public override async Task<Empty> Delete(
+            DeleteTodoRequest request,
+            ServerCallContext context
+        )
         {
-            _logger.LogError("Delete method failed: {ex}", ex);
-            throw;
+            await _repository.DeleteTodoById(request.Id);
+            _logger.LogInformation("Delete method called");
+            return new Empty();
         }
     }
 }

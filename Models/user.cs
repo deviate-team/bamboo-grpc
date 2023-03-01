@@ -17,7 +17,4 @@ public class UserModel
 
     [BsonElement("password")]
     public string Password { get; set; }
-
-    [BsonElement("createAt")]
-    public DateTime CreateAt { get; set; }
 }

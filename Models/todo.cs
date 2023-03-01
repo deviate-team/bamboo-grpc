@@ -16,7 +16,7 @@ public class TodoModel
     public string Description { get; set; }
 
     [BsonElement("dueDate")]
-    public DateTime DueDate { get; set; }
+    public string DueDate { get; set; }
 
     [BsonElement("status")]
     public string Status { get; set; }
@@ -27,10 +27,4 @@ public class TodoModel
     [BsonRepresentation(BsonType.ObjectId)]
     [BsonElement("userId")]
     public string UserId { get; set; }
-
-    [BsonElement("createAt")]
-    public DateTime CreateAt { get; set; }
-
-    [BsonElement("updateAt")]
-    public DateTime updateAt { get; set; }
 }
