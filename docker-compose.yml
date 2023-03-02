@@ -5,7 +5,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: always 
+    restart: always
+    environment:
+      - MONGODB_CONNECTION_STRING=mongodb://root:example@mongo:27017
+      - MONGODB_DATABASE_NAME=mydatabase
+      - REDIS_CONNECT=redis:6379,password=redispassword
     ports:
       - "5000:80"
     depends_on:

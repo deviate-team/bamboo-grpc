@@ -1,113 +1,151 @@
-using bamboo_grpc.Interfaces;
-using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using bamboo_grpc.Models;
+using bamboo_grpc.MongoDB;
 using MongoDB.Driver;
 using MongoDB.Bson;
-using Serilog;
+using StackExchange.Redis;
 
-namespace bamboo_grpc.Repositories
+namespace bamboo_grpc.Repositories;
+
+public class TodosRepository : ITodosRepository
 {
-    internal class TodosRepository : ITodosRepository
+  private readonly ILogger<TodosRepository> _logger;
+  private readonly IMongoCollection<TodoModel> _todos;
+  private readonly ConnectionMultiplexer _redisContext;
+
+  public TodosRepository(
+      ILoggerFactory loggerFactory,
+      IMongoDBContext mongoDBContext,
+      ConnectionMultiplexer redisContext
+  )
+  {
+    this._logger = loggerFactory.CreateLogger<TodosRepository>();
+    this._todos = mongoDBContext.GetCollection<TodoModel>("todos");
+    this._redisContext = redisContext;
+  }
+
+  public async Task<IEnumerable<TodoModel>> GetTodos()
+  {
+    try
     {
-        private readonly ILogger<TodosRepository> _logger;
-        private readonly ConnectionMultiplexer redis;
-        private readonly IMongoCollection<BsonDocument> todosCollection;
-        private int currentId = 1;
+      // Try to get data from Redis cache
+      string cacheKey = "todos:all";
+      string cacheData = await _redisContext.GetDatabase().StringGetAsync(cacheKey);
+      if (!string.IsNullOrEmpty(cacheData) && cacheData != "[]")
+      {
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheData);
+      }
 
-        public TodosRepository(ILoggerFactory loggerFactory)
-        {
+      // If cache miss, fetch data from MongoDB
+      var todos = await _todos.Find(new BsonDocument()).ToListAsync();
 
-            this._logger = loggerFactory.CreateLogger<TodosRepository>();
+      // Cache the data in Redis for future use
+      await _redisContext
+          .GetDatabase()
+          .StringSetAsync(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(todos));
 
-            redis = ConnectionMultiplexer.Connect("redis:6379,password=redispassword");
-            var mongoClient = new MongoClient("mongodb://root:example@mongo:27017");
-            var database = mongoClient.GetDatabase("mydatabase");
-            todosCollection = database.GetCollection<BsonDocument>("todos");
-        }
-
-        public IEnumerable<(int id, string description)> GetTodos()
-        {
-            var results = new List<(int id, string description)>();
-
-            var redisTodos = redis.GetDatabase().StringGet("todos");
-            if (redisTodos.HasValue)
-            {
-                results = Newtonsoft.Json.JsonConvert.DeserializeObject<List<(int id, string description)>>(redisTodos);
-                _logger.LogInformation("Retrieved todos from Redis cache");
-            }
-            else
-            {
-                var todos = todosCollection.Find(new BsonDocument()).ToList();
-                results = todos.Select(t => ((int)t["_id"], t["description"].AsString)).ToList();
-                redis.GetDatabase().StringSet("todos", Newtonsoft.Json.JsonConvert.SerializeObject(results));
-                _logger.LogInformation("Retrieved todos from MongoDB and added to Redis cache");
-            }
-
-            return results;
-        }
-
-        public string GetTodo(int id)
-        {
-            var redisTodo = redis.GetDatabase().HashGet("todo", id);
-            if (redisTodo.HasValue)
-            {
-                _logger.LogInformation("Retrieved todo with id {Id} from Redis cache", id);
-                return redisTodo;
-            }
-            else
-            {
-                var todo = todosCollection.Find(Builders<BsonDocument>.Filter.Eq("_id", id)).FirstOrDefault();
-                if (todo == null)
-                {
-                    _logger.LogInformation("Todo with id {Id} not found in MongoDB", id);
-                    return null;
-                }
-                else
-                {
-                    redis.GetDatabase().HashSet("todo", id, todo["description"].AsString);
-                    _logger.LogInformation("Retrieved todo with id {Id} from MongoDB and added to Redis cache", id);
-                    return todo["description"].AsString;
-                }
-            }
-        }
-
-        public void InsertTodo(string description)
-        {
-            var todo = new BsonDocument
-            {
-                { "_id", currentId },
-                { "description", description }
-            };
-
-            todosCollection.InsertOne(todo);
-            redis.GetDatabase().HashSet("todo", currentId, description);
-
-            _logger.LogInformation("Added new todo with id {Id} to MongoDB and Redis cache", currentId);
-
-            currentId++;
-        }
-
-        public void UpdateTodo(int id, string description)
-        {
-            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
-            var update = Builders<BsonDocument>.Update.Set("description", description);
-            todosCollection.UpdateOne(filter, update);
-
-            redis.GetDatabase().HashSet("todo", id, description);
-
-            _logger.LogInformation("Updated todo with id {Id} in MongoDB and Redis cache", id);
-        }
-
-        public void DeleteTodo(int id)
-        {
-            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
-            todosCollection.DeleteOne(filter);
-
-            redis.GetDatabase().HashDelete("todo", id);
-
-            _logger.LogInformation("Deleted todo with id {Id} from MongoDB and Redis cache", id);
-        }
+      return todos;
     }
+    catch (Exception ex)
+    {
+      _logger.LogError($"Failed to get todos: {ex}");
+      return null;
+    }
+  }
+
+  public async Task<TodoModel> GetTodoById(string id)
+  {
+    try
+    {
+
+      // Try to get data from Redis cache
+      string cacheKey = $"todos:{id}";
+      string cacheData = await _redisContext.GetDatabase().StringGetAsync(cacheKey);
+      if (!string.IsNullOrEmpty(cacheData))
+      {
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<TodoModel>(cacheData);
+      }
+
+      // If cache miss, fetch data from MongoDB
+      FilterDefinition<TodoModel> filter = Builders<TodoModel>.Filter.Eq(m => m.Id, id);
+      var todo = await _todos.Find(filter).FirstOrDefaultAsync();
+
+      // Cache the data in Redis for future use
+      await _redisContext
+          .GetDatabase()
+          .StringSetAsync(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(todo));
+
+      return todo;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError($"Failed to get todo with id {id}: {ex}");
+      return null;
+    }
+  }
+
+  public async Task InsertTodo(
+      string title,
+      string description,
+      string due_date,
+      string status,
+      string priority
+  )
+  {
+    try
+    {
+      var todo = new TodoModel
+      {
+        Title = title,
+        Description = description,
+        DueDate = due_date,
+        Status = status,
+        Priority = priority
+      };
+      await _todos.InsertOneAsync(todo);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError($"Failed to insert todo: {ex}");
+    }
+  }
+
+  public async Task UpdateTodo(
+      string id,
+      string title,
+      string description,
+      string due_date,
+      string status,
+      string priority
+  )
+  {
+    try
+    {
+      FilterDefinition<TodoModel> filter = Builders<TodoModel>.Filter.Eq(m => m.Id, id);
+      UpdateDefinition<TodoModel> update = Builders<TodoModel>.Update
+          .Set(m => m.Title, title)
+          .Set(m => m.Description, description)
+          .Set(m => m.DueDate, due_date)
+          .Set(m => m.Status, status)
+          .Set(m => m.Priority, priority);
+
+      await _todos.UpdateOneAsync(filter, update);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError($"Failed to update todo with id {id}: {ex}");
+    }
+  }
+
+  public async Task DeleteTodoById(string id)
+  {
+    try
+    {
+      FilterDefinition<TodoModel> filter = Builders<TodoModel>.Filter.Eq(m => m.Id, id);
+      await _todos.DeleteOneAsync(filter);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError($"Failed to delete todo with id {id}: {ex}");
+    }
+  }
 }
