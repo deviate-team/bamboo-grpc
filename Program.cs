@@ -1,12 +1,11 @@
-using bamboo_grpc.Repositories;
-using bamboo_grpc.Services;
-using bamboo_grpc.MongoDB;
-using bamboo_grpc.Managers;
 using StackExchange.Redis;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using bamboo_grpc.Repositories;
+using bamboo_grpc.Services;
+using bamboo_grpc.MongoDB;
+using bamboo_grpc.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,7 +30,7 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(JwtAuthenticationManager.JWT_TOKEN_KEY)),
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(JwtAuthentication.JWT_TOKEN_KEY)),
         ValidateIssuer = false,
         ValidateAudience = false
     };

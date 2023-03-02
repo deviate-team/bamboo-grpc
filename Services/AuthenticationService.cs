@@ -1,9 +1,7 @@
 using Grpc.Core;
-using BCrypt.Net;
 using Authentication;
-using bamboo_grpc.Models;
-using bamboo_grpc.Managers;
-using bamboo_grpc.Repositories;
+using bamboo_grpc.Interfaces;
+
 namespace bamboo_grpc.Services;
 
 public class AuthenticationService : Authentication.Authentication.AuthenticationBase
@@ -42,7 +40,7 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
       }
 
       // generate token
-      var authenticationResponse = JwtAuthenticationManager.GenerateToken(user.Id, "User");
+      var authenticationResponse = JwtAuthentication.GenerateToken(user.Id, "User");
       return authenticationResponse;
     }
     catch (Exception ex)
@@ -93,7 +91,7 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
       var user = await _repository.GetUserByUsername(request.Username);
 
       // generate token
-      var authenticationResponse = JwtAuthenticationManager.GenerateToken(user.Id, "User");
+      var authenticationResponse = JwtAuthentication.GenerateToken(user.Id, "User");
       return authenticationResponse;
     }
     catch (Exception ex)

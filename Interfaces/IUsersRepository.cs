@@ -1,6 +1,6 @@
 using bamboo_grpc.Models;
 
-namespace bamboo_grpc.Repositories;
+namespace bamboo_grpc.Interfaces;
 
 public interface IUsersRepository
 {
