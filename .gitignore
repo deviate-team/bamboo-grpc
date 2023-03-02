@@ -40,3 +40,6 @@ global.json
 build/feed
 .dotnet/
 *.log.txt
+db/
+cache/
+.config/
