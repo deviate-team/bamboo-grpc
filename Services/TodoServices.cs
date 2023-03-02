@@ -2,8 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Todo;
-using bamboo_grpc.Repositories;
-using bamboo_grpc.Managers;
+using bamboo_grpc.Interfaces;
 
 namespace bamboo_grpc.Services
 {
@@ -57,7 +56,7 @@ namespace bamboo_grpc.Services
       try
       {
         var token = context.RequestHeaders.GetValue("Authorization");
-        var userId = JwtAuthenticationManager.DecodeToken(token);
+        var userId = JwtAuthentication.DecodeToken(token);
 
         var reply = new GetTodosReply();
         reply.Todos.AddRange(
@@ -121,7 +120,7 @@ namespace bamboo_grpc.Services
       {
         // get user id from token
         var token = context.RequestHeaders.GetValue("Authorization");
-        var userId = JwtAuthenticationManager.DecodeToken(token);
+        var userId = JwtAuthentication.DecodeToken(token);
 
         // insert todo
         await _repository.InsertTodo(
@@ -160,7 +159,7 @@ namespace bamboo_grpc.Services
 
         // Check if user is allowed to update todo
         var token = context.RequestHeaders.GetValue("Authorization");
-        var userId = JwtAuthenticationManager.DecodeToken(token);
+        var userId = JwtAuthentication.DecodeToken(token);
         if (existingTodo.UserId != userId)
         {
           throw new RpcException(new Status(StatusCode.PermissionDenied, "You are not allowed to update this todo"));
@@ -206,7 +205,7 @@ namespace bamboo_grpc.Services
 
         // Check if user is allowed to delete todo
         var token = context.RequestHeaders.GetValue("Authorization");
-        var userId = JwtAuthenticationManager.DecodeToken(token);
+        var userId = JwtAuthentication.DecodeToken(token);
         if (existingTodo.UserId != userId)
         {
           throw new RpcException(new Status(StatusCode.PermissionDenied, "You are not allowed to delete this todo"));

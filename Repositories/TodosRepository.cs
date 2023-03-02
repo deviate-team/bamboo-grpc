@@ -1,9 +1,8 @@
-using bamboo_grpc.Models;
-using bamboo_grpc.MongoDB;
 using MongoDB.Driver;
-using MongoDB.Bson;
 using StackExchange.Redis;
 using Newtonsoft.Json;
+using bamboo_grpc.Models;
+using bamboo_grpc.Interfaces;
 
 namespace bamboo_grpc.Repositories;
 

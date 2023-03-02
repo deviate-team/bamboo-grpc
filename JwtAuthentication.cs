@@ -4,12 +4,11 @@ using System.Security.Claims;
 using Authentication;
 using System.Text;
 
-namespace bamboo_grpc.Managers;
-
-public static class JwtAuthenticationManager
+public static class JwtAuthentication
 {
-  public const string JWT_TOKEN_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImV4cCI6MTY3Nzc1NzY2NywiaWF0IjoxNjc3NzU3NjY3fQ.59MdX9RDSTvr7wrK4RxkQuODdsmFFlTluELYbczPuXs";
-  public const int JWT_TOKEN_EXPIRATION = 24;
+
+  public static string JWT_TOKEN_KEY =  Environment.GetEnvironmentVariable("JWT_TOKEN_KEY");
+  public static int JWT_TOKEN_EXPIRE = int.Parse(Environment.GetEnvironmentVariable("JWT_TOKEN_EXPIRE"));
   public static AuthenticateResponse GenerateToken(string user_id, string role)
   {
     var tokenHandler = new JwtSecurityTokenHandler();
@@ -21,7 +20,7 @@ public static class JwtAuthenticationManager
         new Claim(ClaimTypes.Role, role),
         new Claim(ClaimTypes.Name, user_id)
       }),
-      Expires = System.DateTime.UtcNow.AddHours(JWT_TOKEN_EXPIRATION),
+      Expires = System.DateTime.UtcNow.AddHours(JWT_TOKEN_EXPIRE),
       SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
     };
     var token = tokenHandler.CreateToken(tokenDescriptor);

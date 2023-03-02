@@ -1,11 +1,7 @@
 using MongoDB.Driver;
+using bamboo_grpc.Interfaces;
 
 namespace bamboo_grpc.MongoDB;
-
-public interface IMongoDBContext
-{
-    IMongoCollection<T> GetCollection<T>(string name);
-}
 
 public class MongoDBContext : IMongoDBContext
 {
