@@ -130,9 +130,17 @@ public class TodosRepository : ITodosRepository
           .Set(m => m.Priority, priority);
 
       await _todos.UpdateOneAsync(filter, update);
-
       string cacheKey = $"todos:{id}";
-      await _redisContext.GetDatabase().KeyDeleteAsync(cacheKey);
+      var todo = new TodoModel
+      {
+        Id = id,
+        Title = title,
+        Description = description,
+        DueDate = due_date,
+        Status = status,
+        Priority = priority
+      };
+      await _redisContext.GetDatabase().StringSetAsync(cacheKey, JsonConvert.SerializeObject(todo));
     }
     catch (Exception ex)
     {
