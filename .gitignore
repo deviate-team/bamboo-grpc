@@ -42,3 +42,4 @@ build/feed
 *.log.txt
 db/
 cache/
+.config/
