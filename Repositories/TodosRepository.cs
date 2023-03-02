@@ -3,6 +3,7 @@ using bamboo_grpc.MongoDB;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using StackExchange.Redis;
+using Newtonsoft.Json;
 
 namespace bamboo_grpc.Repositories;
 
@@ -27,28 +28,27 @@ public class TodosRepository : ITodosRepository
   {
     try
     {
-      // Try to get data from Redis cache
       string cacheKey = "todos:all";
       string cacheData = await _redisContext.GetDatabase().StringGetAsync(cacheKey);
-      if (!string.IsNullOrEmpty(cacheData) && cacheData != "[]")
+
+      if (cacheData != null && cacheData.ToString() != "[]")
       {
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheData);
+        return JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheData);
       }
 
-      // If cache miss, fetch data from MongoDB
-      var todos = await _todos.Find(new BsonDocument()).ToListAsync();
+      var todos = await _todos.Find(_ => true).ToListAsync();
 
-      // Cache the data in Redis for future use
-      await _redisContext
-          .GetDatabase()
-          .StringSetAsync(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(todos));
+      if (todos != null)
+      {
+        await _redisContext.GetDatabase().StringSetAsync(cacheKey, JsonConvert.SerializeObject(todos));
+      }
 
       return todos;
     }
     catch (Exception ex)
     {
       _logger.LogError($"Failed to get todos: {ex}");
-      return null;
+      throw;
     }
   }
 
@@ -57,29 +57,27 @@ public class TodosRepository : ITodosRepository
     try
     {
 
-      // Try to get data from Redis cache
       string cacheKey = $"todos:{id}";
       string cacheData = await _redisContext.GetDatabase().StringGetAsync(cacheKey);
-      if (!string.IsNullOrEmpty(cacheData))
+      if (cacheData != null && cacheData != "{}")
       {
-        return Newtonsoft.Json.JsonConvert.DeserializeObject<TodoModel>(cacheData);
+        return JsonConvert.DeserializeObject<TodoModel>(cacheData);
       }
 
-      // If cache miss, fetch data from MongoDB
-      FilterDefinition<TodoModel> filter = Builders<TodoModel>.Filter.Eq(m => m.Id, id);
+      var filter = Builders<TodoModel>.Filter.Eq(m => m.Id, id);
       var todo = await _todos.Find(filter).FirstOrDefaultAsync();
 
-      // Cache the data in Redis for future use
-      await _redisContext
-          .GetDatabase()
-          .StringSetAsync(cacheKey, Newtonsoft.Json.JsonConvert.SerializeObject(todo));
+      if (todo != null)
+      {
+        await _redisContext.GetDatabase().StringSetAsync(cacheKey, JsonConvert.SerializeObject(todo));
+      }
 
       return todo;
     }
     catch (Exception ex)
     {
       _logger.LogError($"Failed to get todo with id {id}: {ex}");
-      return null;
+      throw;
     }
   }
 
@@ -102,10 +100,13 @@ public class TodosRepository : ITodosRepository
         Priority = priority
       };
       await _todos.InsertOneAsync(todo);
+      string cacheKey = "todos:all";
+      await _redisContext.GetDatabase().KeyDeleteAsync(cacheKey);
     }
     catch (Exception ex)
     {
       _logger.LogError($"Failed to insert todo: {ex}");
+      throw;
     }
   }
 
@@ -129,10 +130,14 @@ public class TodosRepository : ITodosRepository
           .Set(m => m.Priority, priority);
 
       await _todos.UpdateOneAsync(filter, update);
+
+      string cacheKey = $"todos:{id}";
+      await _redisContext.GetDatabase().KeyDeleteAsync(cacheKey);
     }
     catch (Exception ex)
     {
       _logger.LogError($"Failed to update todo with id {id}: {ex}");
+      throw;
     }
   }
 
@@ -142,10 +147,14 @@ public class TodosRepository : ITodosRepository
     {
       FilterDefinition<TodoModel> filter = Builders<TodoModel>.Filter.Eq(m => m.Id, id);
       await _todos.DeleteOneAsync(filter);
+
+      string cacheKey = $"todos:{id}";
+      await _redisContext.GetDatabase().KeyDeleteAsync(cacheKey);
     }
     catch (Exception ex)
     {
       _logger.LogError($"Failed to delete todo with id {id}: {ex}");
+      throw;
     }
   }
 }

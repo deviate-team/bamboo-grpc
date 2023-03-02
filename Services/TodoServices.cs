@@ -1,10 +1,7 @@
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
-using System.Linq;
 using Todo;
-using bamboo_grpc;
 using bamboo_grpc.Repositories;
-using bamboo_grpc.Models;
 
 namespace bamboo_grpc.Services
 {
@@ -13,10 +10,10 @@ namespace bamboo_grpc.Services
         private readonly ITodosRepository _repository;
         private readonly ILogger<TodoService> _logger;
 
-        public TodoService(ITodosRepository repository, ILoggerFactory loggerFactory)
+        public TodoService(ITodosRepository repository, ILogger<TodoService> logger)
         {
             this._repository = repository;
-            this._logger = loggerFactory.CreateLogger<TodoService>();
+            this._logger =  logger;
         }
 
         public override async Task<GetTodosReply> GetAll(Empty request, ServerCallContext context)
@@ -24,16 +21,15 @@ namespace bamboo_grpc.Services
             var response = new GetTodosReply();
             response.Todos.AddRange(
                 (await _repository.GetTodos()).Select(
-                    t =>
-                        new GetTodoReply
-                        {
-                            Id = t.Id,
-                            Title = t.Title,
-                            Description = t.Description,
-                            DueDate = t.DueDate,
-                            Status = t.Status,
-                            Priority = t.Priority,
-                        }
+                    t => new GetTodoReply
+                    {
+                        Id = t.Id,
+                        Title = t.Title,
+                        Description = t.Description,
+                        DueDate = t.DueDate,
+                        Status = t.Status,
+                        Priority = t.Priority,
+                    }
                 )
             );
 
@@ -46,15 +42,15 @@ namespace bamboo_grpc.Services
             ServerCallContext context
         )
         {
-            var todos = await _repository.GetTodoById(request.Id);
+            var todo = await _repository.GetTodoById(request.Id);
             var response = new GetTodoReply
             {
-                Id = todos.Id,
-                Title = todos.Title,
-                Description = todos.Description,
-                DueDate = todos.DueDate,
-                Status = todos.Status,
-                Priority = todos.Priority,
+                Id = todo.Id,
+                Title = todo.Title,
+                Description = todo.Description,
+                DueDate = todo.DueDate,
+                Status = todo.Status,
+                Priority = todo.Priority,
             };
             _logger.LogInformation("Get method called");
             return response;
