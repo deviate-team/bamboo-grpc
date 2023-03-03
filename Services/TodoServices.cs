@@ -212,7 +212,7 @@ namespace bamboo_grpc.Services
         }
 
         // Delete todo
-        await _repository.DeleteTodoById(request.Id);
+        await _repository.DeleteTodoById(request.Id, userId);
         _logger.LogInformation("Delete method called");
         return new Empty();
       }

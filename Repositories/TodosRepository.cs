@@ -200,7 +200,7 @@ public class TodosRepository : ITodosRepository
     }
   }
 
-  public async Task DeleteTodoById(string id)
+  public async Task DeleteTodoById(string id, string userId)
   {
     try
     {
@@ -222,6 +222,20 @@ public class TodosRepository : ITodosRepository
           {
             todos = todos.Where(m => m.Id != id);
             await _redisContext.GetDatabase().StringSetAsync(cacheKeyAll, JsonConvert.SerializeObject(todos));
+          }
+        }
+
+        // Update the cached data for the entire list of todos by user id
+        string cacheKeyAllByUserId = $"todos:all:{userId}";
+        string cacheDataAllByUserId = await _redisContext.GetDatabase().StringGetAsync(cacheKeyAllByUserId);
+        if (!string.IsNullOrEmpty(cacheDataAllByUserId) && cacheDataAllByUserId != "[]")
+        {
+          IEnumerable<TodoModel> todos = JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheDataAllByUserId);
+          int index = todos.ToList().FindIndex(m => m.Id == id);
+          if (index != -1)
+          {
+            todos = todos.Where(m => m.Id != id);
+            await _redisContext.GetDatabase().StringSetAsync(cacheKeyAllByUserId, JsonConvert.SerializeObject(todos));
           }
         }
       }
