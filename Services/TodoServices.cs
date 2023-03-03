@@ -44,6 +44,7 @@ namespace bamboo_grpc.Services
       catch (Exception ex)
       {
         throw new RpcException(new Status(StatusCode.Unavailable, "Error"));
+        _logger.LogError($"Failed to get todos: {ex}");
       }
     }
 
@@ -79,6 +80,7 @@ namespace bamboo_grpc.Services
       catch (Exception ex)
       {
         throw new RpcException(new Status(StatusCode.Unavailable, "Error"));
+        _logger.LogError($"Failed to get todos: {ex}");
       }
     }
 
@@ -89,13 +91,20 @@ namespace bamboo_grpc.Services
     {
       try
       {
-        // check if id is empty
         if (string.IsNullOrEmpty(request.Id))
         {
           throw new RpcException(new Status(StatusCode.InvalidArgument, "Id is required"));
         }
-        // get todo
+
+        var token = context.RequestHeaders.GetValue("Authorization");
+        var userId = JwtAuthentication.DecodeToken(token);
+
         var todo = await _repository.GetTodoById(request.Id);
+        if (todo == null)
+        {
+          throw new RpcException(new Status(StatusCode.NotFound, "Todo not found"));
+        }
+
         var reply = new GetTodoReply
         {
           Id = todo.Id,
@@ -111,6 +120,7 @@ namespace bamboo_grpc.Services
       catch (Exception ex)
       {
         throw new RpcException(new Status(StatusCode.Unavailable, "Error"));
+        _logger.LogError($"Failed to get todo: {ex}");
       }
     }
 
@@ -118,11 +128,14 @@ namespace bamboo_grpc.Services
     {
       try
       {
-        // get user id from token
+        if (string.IsNullOrEmpty(request.Title))
+        {
+          throw new RpcException(new Status(StatusCode.InvalidArgument, "Title is required"));
+        }
+
         var token = context.RequestHeaders.GetValue("Authorization");
         var userId = JwtAuthentication.DecodeToken(token);
 
-        // insert todo
         await _repository.InsertTodo(
           request.Title,
           request.Description,
@@ -137,6 +150,7 @@ namespace bamboo_grpc.Services
       catch (Exception ex)
       {
         throw new RpcException(new Status(StatusCode.Unavailable, "Error"));
+        _logger.LogError(ex, $"failed to insert todo ex: {ex}");
       }
     }
 
@@ -144,35 +158,31 @@ namespace bamboo_grpc.Services
     {
       try
       {
-        // Check if id is provided
         if (string.IsNullOrEmpty(request.Id))
         {
           throw new RpcException(new Status(StatusCode.InvalidArgument, "Id is required"));
         }
 
-        // Check if todo exists
+        var token = context.RequestHeaders.GetValue("Authorization");
+        var userId = JwtAuthentication.DecodeToken(token);
+
         var existingTodo = await _repository.GetTodoById(request.Id);
         if (existingTodo == null)
         {
           throw new RpcException(new Status(StatusCode.NotFound, "Todo not found"));
         }
-
-        // Check if user is allowed to update todo
-        var token = context.RequestHeaders.GetValue("Authorization");
-        var userId = JwtAuthentication.DecodeToken(token);
         if (existingTodo.UserId != userId)
         {
           throw new RpcException(new Status(StatusCode.PermissionDenied, "You are not allowed to update this todo"));
         }
-
-        // Update todo
         await _repository.UpdateTodo(
           request.Id,
           request.Title,
           request.Description,
           request.DueDate,
           request.Status,
-          request.Priority
+          request.Priority,
+          userId
       );
         _logger.LogInformation("Put method called");
         return new Empty();
@@ -180,6 +190,7 @@ namespace bamboo_grpc.Services
       catch (Exception ex)
       {
         throw new RpcException(new Status(StatusCode.Unavailable, "Error"));
+        _logger.LogError(ex, $"failed to update todo ex: {ex}");
       }
     }
 
@@ -190,20 +201,17 @@ namespace bamboo_grpc.Services
     {
       try
       {
-        // Check if id is provided
         if (string.IsNullOrEmpty(request.Id))
         {
           throw new RpcException(new Status(StatusCode.InvalidArgument, "Id is required"));
         }
 
-        // Check if todo exists
         var existingTodo = await _repository.GetTodoById(request.Id);
         if (existingTodo == null)
         {
           throw new RpcException(new Status(StatusCode.NotFound, "Todo not found"));
         }
 
-        // Check if user is allowed to delete todo
         var token = context.RequestHeaders.GetValue("Authorization");
         var userId = JwtAuthentication.DecodeToken(token);
         if (existingTodo.UserId != userId)
@@ -211,7 +219,6 @@ namespace bamboo_grpc.Services
           throw new RpcException(new Status(StatusCode.PermissionDenied, "You are not allowed to delete this todo"));
         }
 
-        // Delete todo
         await _repository.DeleteTodoById(request.Id, userId);
         _logger.LogInformation("Delete method called");
         return new Empty();
@@ -219,6 +226,7 @@ namespace bamboo_grpc.Services
       catch (Exception ex)
       {
         throw new RpcException(new Status(StatusCode.Unavailable, "Error"));
+        _logger.LogError(ex, $"failed to delete todo ex: {ex}");
       }
     }
   }

@@ -27,7 +27,6 @@ public class TodosRepository : ITodosRepository
   {
     try
     {
-      // check cache
       string cacheKey = "todos:all";
       string cacheData = await _redisContext.GetDatabase().StringGetAsync(cacheKey);
       if (!string.IsNullOrEmpty(cacheData) && cacheData != "[]")
@@ -36,11 +35,11 @@ public class TodosRepository : ITodosRepository
         return JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheData);
       }
 
-      // get data from database
       var todos = await _todos.Find(_ => true).ToListAsync();
+      _logger.LogInformation("Get Data from Mongo..");
       if (todos != null)
       {
-        _logger.LogInformation("cache not found.. Get Data from Mongo..");
+        _logger.LogInformation("Cached data to Redis..");
         await _redisContext.GetDatabase().StringSetAsync(cacheKey, JsonConvert.SerializeObject(todos), TimeSpan.FromMinutes(15));
       }
       return todos;
@@ -55,7 +54,6 @@ public class TodosRepository : ITodosRepository
   {
     try
     {
-      // check cache
       string cacheKey = $"todos:{id}";
       string cacheData = await _redisContext.GetDatabase().StringGetAsync(cacheKey);
       if (!string.IsNullOrEmpty(cacheData) && cacheData != "{}")
@@ -64,11 +62,11 @@ public class TodosRepository : ITodosRepository
         return JsonConvert.DeserializeObject<TodoModel>(cacheData);
       }
 
-      // get data from database
       var todo = await _todos.Find(_ => _.Id == id).FirstOrDefaultAsync();
+      _logger.LogInformation("Get Data by ID from Mongo..");
       if (todo != null)
       {
-        _logger.LogInformation("cache not found.. Get Data by ID from Mongo..");
+        _logger.LogInformation("Cached data to Redis..");
         await _redisContext.GetDatabase().StringSetAsync(cacheKey, JsonConvert.SerializeObject(todo), TimeSpan.FromMinutes(15));
       }
 
@@ -93,9 +91,10 @@ public class TodosRepository : ITodosRepository
         return JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheData);
       }
       var todos = await _todos.Find(_ => _.UserId == userId).ToListAsync();
+      _logger.LogInformation("Get Data by User ID from Mongo..");
       if (todos != null)
       {
-        _logger.LogInformation("cache not found.. Get Data by User ID from Mongo..");
+        _logger.LogInformation("Cached data to Redis..");
         await _redisContext.GetDatabase().StringSetAsync(cacheKey, JsonConvert.SerializeObject(todos), TimeSpan.FromMinutes(15));
       }
 
@@ -128,12 +127,28 @@ public class TodosRepository : ITodosRepository
         Priority = priority,
         UserId = userId
       };
-      // Insert the new todo into the database
       await _todos.InsertOneAsync(todo);
+      _logger.LogInformation("Inserted todo to Mongo..");
 
-      // Update the cached data for the entire list of todos
       string cacheKey = "todos:all";
-      await _redisContext.GetDatabase().KeyDeleteAsync(cacheKey);
+      var cacheData = await _redisContext.GetDatabase().StringGetAsync(cacheKey);
+      if (!string.IsNullOrEmpty(cacheData))
+      {
+        var todos = JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheData);
+        todos = todos.Append(todo);
+        await _redisContext.GetDatabase().StringSetAsync(cacheKey, JsonConvert.SerializeObject(todos));
+        _logger.LogInformation("Cached todo all data to Redis..");
+      }
+
+      string cacheKeyAll = $"todos:all:{userId}";
+      var cacheDataAll = await _redisContext.GetDatabase().StringGetAsync(cacheKeyAll);
+      if (!string.IsNullOrEmpty(cacheDataAll))
+      {
+        var todos = JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheDataAll);
+        todos = todos.Append(todo);
+        await _redisContext.GetDatabase().StringSetAsync(cacheKeyAll, JsonConvert.SerializeObject(todos));
+        _logger.LogInformation("Cached todo data by user id to Redis..");
+      }
     }
     catch (Exception ex)
     {
@@ -148,31 +163,29 @@ public class TodosRepository : ITodosRepository
   string description,
   string due_date,
   string status,
-  string priority
+  string priority,
+  string userId
 )
   {
     try
     {
-      // Find the existing todo in the database
       var existingTodo = await _todos.Find(_ => _.Id == id).FirstOrDefaultAsync();
       if (existingTodo == null)
       {
         throw new Exception("Todo not found");
       }
-
-      // Update the existing todo in the database
       existingTodo.Title = title;
       existingTodo.Description = description;
       existingTodo.DueDate = due_date;
       existingTodo.Status = status;
       existingTodo.Priority = priority;
       await _todos.ReplaceOneAsync(_ => _.Id == id, existingTodo);
+      _logger.LogInformation("Updated todo to Mongo..");
 
-      // Update the cached data for the individual todo
       var cacheKey = $"todos:{id}";
       await _redisContext.GetDatabase().StringSetAsync(cacheKey, JsonConvert.SerializeObject(existingTodo));
+      _logger.LogInformation("Cached todo data by Id to Redis..");
 
-      // Update the cached data for the entire list of todos
       var cacheKeyAll = "todos:all";
       var cacheDataAll = await _redisContext.GetDatabase().StringGetAsync(cacheKeyAll);
       if (!string.IsNullOrEmpty(cacheDataAll))
@@ -191,6 +204,28 @@ public class TodosRepository : ITodosRepository
           return todo;
         });
         await _redisContext.GetDatabase().StringSetAsync(cacheKeyAll, JsonConvert.SerializeObject(updatedTodos));
+        _logger.LogInformation("Cached todo all data to Redis..");
+      }
+
+      var cacheKeyAllByUserId = $"todos:all:{userId}";
+      var cacheDataAllByUserId = await _redisContext.GetDatabase().StringGetAsync(cacheKeyAllByUserId);
+      if (!string.IsNullOrEmpty(cacheDataAllByUserId))
+      {
+        var todos = JsonConvert.DeserializeObject<IEnumerable<TodoModel>>(cacheDataAllByUserId);
+        var updatedTodos = todos.Select(todo =>
+        {
+          if (todo.Id == id)
+          {
+            todo.Title = title;
+            todo.Description = description;
+            todo.DueDate = due_date;
+            todo.Status = status;
+            todo.Priority = priority;
+          }
+          return todo;
+        });
+        await _redisContext.GetDatabase().StringSetAsync(cacheKeyAllByUserId, JsonConvert.SerializeObject(updatedTodos));
+        _logger.LogInformation("Cached todo all data by user id to Redis..");
       }
     }
     catch (Exception ex)
@@ -204,14 +239,14 @@ public class TodosRepository : ITodosRepository
   {
     try
     {
-      // Delete the todo from the database
       var result = await _todos.DeleteOneAsync(_ => _.Id == id);
+      _logger.LogInformation("Deleted todo from Mongo..");
       if (result.DeletedCount == 1)
       {
         string cacheKey = $"todos:{id}";
         await _redisContext.GetDatabase().KeyDeleteAsync(cacheKey);
+        _logger.LogInformation("Deleted todo data by Id from Redis..");
 
-        // Update the cached data for the entire list of todos
         string cacheKeyAll = "todos:all";
         string cacheDataAll = await _redisContext.GetDatabase().StringGetAsync(cacheKeyAll);
         if (!string.IsNullOrEmpty(cacheDataAll) && cacheDataAll != "[]")
@@ -222,10 +257,10 @@ public class TodosRepository : ITodosRepository
           {
             todos = todos.Where(m => m.Id != id);
             await _redisContext.GetDatabase().StringSetAsync(cacheKeyAll, JsonConvert.SerializeObject(todos));
+            _logger.LogInformation("Deleted todo all data from Redis..");
           }
         }
 
-        // Update the cached data for the entire list of todos by user id
         string cacheKeyAllByUserId = $"todos:all:{userId}";
         string cacheDataAllByUserId = await _redisContext.GetDatabase().StringGetAsync(cacheKeyAllByUserId);
         if (!string.IsNullOrEmpty(cacheDataAllByUserId) && cacheDataAllByUserId != "[]")
@@ -236,6 +271,7 @@ public class TodosRepository : ITodosRepository
           {
             todos = todos.Where(m => m.Id != id);
             await _redisContext.GetDatabase().StringSetAsync(cacheKeyAllByUserId, JsonConvert.SerializeObject(todos));
+            _logger.LogInformation("Deleted todo all data by user id from Redis..");
           }
         }
       }
