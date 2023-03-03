@@ -18,7 +18,6 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
   {
     try
     {
-      // validate request
       if (string.IsNullOrEmpty(request.Username))
       {
         throw new RpcException(new Status(StatusCode.InvalidArgument, "Username is required"));
@@ -28,7 +27,6 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
         throw new RpcException(new Status(StatusCode.InvalidArgument, "Password is required"));
       }
 
-      // check user exists
       var user = await _repository.GetUserByUsername(request.Username);
       if (user == null)
       {
@@ -39,13 +37,13 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
         throw new RpcException(new Status(StatusCode.Unauthenticated, "Invalid password"));
       }
 
-      // generate token
-      var authenticationResponse = JwtAuthentication.GenerateToken(user.Id, "User");
-      return authenticationResponse;
+      var reply = JwtAuthentication.GenerateToken(user.Id, "User");
+      return reply;
     }
     catch (Exception ex)
     {
       throw new RpcException(new Status(StatusCode.Unavailable, "Error"));
+      _logger.LogError($"Failed to login: {ex}");
     }
   }
 
@@ -53,7 +51,6 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
   {
     try
     {
-      // validate request
       if (string.IsNullOrEmpty(request.Username))
       {
         throw new RpcException(new Status(StatusCode.InvalidArgument, "Username is required"));
@@ -75,7 +72,6 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
         throw new RpcException(new Status(StatusCode.InvalidArgument, "Password must be at least 6 characters"));
       }
 
-      // check user exists
       if (await _repository.GetUserByUsername(request.Username) != null)
       {
         throw new RpcException(new Status(StatusCode.AlreadyExists, "Username is already taken"));
@@ -85,14 +81,12 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
         throw new RpcException(new Status(StatusCode.AlreadyExists, "Email is already taken"));
       }
 
-      // create user
       var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password, 12);
       await _repository.InsertUser(request.Username, hashedPassword, request.Email, "User");
       var user = await _repository.GetUserByUsername(request.Username);
 
-      // generate token
-      var authenticationResponse = JwtAuthentication.GenerateToken(user.Id, "User");
-      return authenticationResponse;
+      var reply = JwtAuthentication.GenerateToken(user.Id, "User");
+      return reply;
     }
     catch (Exception ex)
     {
@@ -100,7 +94,7 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
     }
   }
 
-  bool IsValidEmail(string email)
+  private bool IsValidEmail(string email)
   {
     var trimmedEmail = email.Trim();
 
@@ -119,7 +113,7 @@ public class AuthenticationService : Authentication.Authentication.Authenticatio
     }
   }
 
-  bool IsValidPassword(string password)
+  private bool IsValidPassword(string password)
   {
     var trimmedPassword = password.Trim();
     if (trimmedPassword.Length < 6)
