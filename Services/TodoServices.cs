@@ -163,6 +163,11 @@ namespace bamboo_grpc.Services
           throw new RpcException(new Status(StatusCode.InvalidArgument, "Id is required"));
         }
 
+        if (string.IsNullOrEmpty(request.Title))
+        {
+          throw new RpcException(new Status(StatusCode.InvalidArgument, "Title is required"));
+        }
+
         var token = context.RequestHeaders.GetValue("Authorization");
         var userId = JwtAuthentication.DecodeToken(token);
 
