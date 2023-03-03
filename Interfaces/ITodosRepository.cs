@@ -9,5 +9,5 @@ public interface ITodosRepository
     Task<TodoModel> GetTodoById(string id);
     Task InsertTodo(string title, string description, string due_date, string status, string priority, string userId);
     Task UpdateTodo(string id, string title, string description, string due_date, string status, string priority);
-    Task DeleteTodoById(string id);
+    Task DeleteTodoById(string id, string userId);
 }
