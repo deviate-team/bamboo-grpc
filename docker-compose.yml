@@ -10,6 +10,8 @@ services:
       - MONGODB_CONNECTION_STRING=mongodb://root:example@mongo:27017
       - MONGODB_DATABASE_NAME=mydatabase
       - REDIS_CONNECT=redis:6379,password=redispassword
+      - JWT_TOKEN_KEY=eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImV4cCI6MTY3Nzc5MDIyMCwiaWF0IjoxNjc3NzkwMjIwfQ.RBuuflasRF5HsccefixPmct6I-PzLdWlvBke0kJpiaU
+      - JWT_TOKEN_EXPIRE=24
     ports:
       - "5000:80"
     depends_on:

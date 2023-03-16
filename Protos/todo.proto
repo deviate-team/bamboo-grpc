@@ -6,6 +6,7 @@ package todo;
 
 service Todo {
     rpc GetAll (google.protobuf.Empty) returns (GetTodosReply);
+    rpc GetByUserId (google.protobuf.Empty) returns (GetTodosReply);
     rpc Get (GetTodoRequest) returns (GetTodoReply);
     rpc Put (PutTodoRequest) returns (google.protobuf.Empty);
     rpc Post (PostTodoRequest) returns (google.protobuf.Empty);
@@ -24,7 +25,7 @@ message GetTodoReply {
     string status = 5;
     string priority = 6;
 }
-    
+
 message GetTodosReply {
     repeated GetTodoReply todos = 1;
 }
