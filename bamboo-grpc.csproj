@@ -20,7 +20,7 @@
     <PackageReference Include="BCrypt.Net" Version="0.1.0" />
     <PackageReference Include="Google.Protobuf" Version="3.22.0" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.51.0" />
-    <PackageReference Include="Grpc.AspNetCore.Server" Version="2.51.0" />
+    <PackageReference Include="Grpc.AspNetCore.Server" Version="2.52.0" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.51.0" />
     <PackageReference Include="Grpc.Tools" Version="2.51.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
